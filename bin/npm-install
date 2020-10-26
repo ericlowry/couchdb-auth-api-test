@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+if [ $# -le 1 ]
+then
+  echo "usage: npm-install package service"
+  exit 1
+fi
+
+PACKAGE=$1
+SERVICE=$2
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+docker-compose stop $SERVICE
+
+pushd $DIR/../$SERVICE
+
+npm install --save $PACKAGE
+
+popd
+
+docker-compose build $SERVICE
+docker-compose start $SERVICE

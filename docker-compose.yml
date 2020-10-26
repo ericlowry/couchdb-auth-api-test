@@ -1,0 +1,71 @@
+#
+# docker-compose.yml
+#
+
+version: '3.8'
+
+volumes:
+  db-data:
+
+services:
+
+  db:
+    build: ./db
+    ports:
+      - 5984:5984
+    volumes:
+      - ./db/cluster-setup:/bin/cluster-setup
+      - db-data:/opt/couchdb/data
+    environment:
+      - COUCHDB_HOST=http://db:5984
+      - COUCHDB_USER
+      - COUCHDB_PASSWORD
+
+  cache:
+    image: redis:6.0
+    sysctls:
+      - net.core.somaxconn=511
+    volumes:
+      - ./cache/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    environment: 
+      - TOKEN_CACHE
+      - SESSION_CACHE
+    command: 'redis-server /usr/local/etc/redis/redis.conf'
+
+  auth:
+    build: ./auth
+    depends_on:
+      - db
+      - cache
+    ports:
+      - 3001:3001
+    volumes: 
+      - ./auth/package.json/:/opt/auth/package.json
+      - ./auth/package-lock.json:/opt/auth/package-lock.json
+      - ./auth/src:/opt/auth/src
+    environment: 
+      - PORT=3001
+      - USERDB=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@db:5984/_users
+      - TOKEN_CACHE
+      - SESSION_CACHE
+      - DEBUG=auth:*
+    tty: true
+    command: nodemon --watch ./src src/auth-service.js
+  
+  api:
+    build: ./api
+    depends_on:
+      - db
+      - cache
+    ports:
+      - 3002:3002
+    volumes: 
+      - ./api/package.json/:/opt/api/package.json
+      - ./api/package-lock.json:/opt/api/package-lock.json
+      - ./api/src:/opt/api/src
+    environment: 
+      - PORT=3002
+    tty: true
+    command: nodemon --watch ./src src/api-service.js
+    
+  

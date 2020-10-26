@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+if [[ -z "${COUCHDB_HOST}" ]]; then
+  echo "ERROR: COUCHDB_HOST is not set"
+  exit 1
+fi
+
+if [[ -z "${COUCHDB_USER}" ]]; then
+  echo "ERROR: COUCHDB_USER is not set"
+  exit 1
+fi
+
+if [[ -z "${COUCHDB_PASSWORD}" ]]; then
+  echo "ERROR: COUCHDB_PASSWORD is not set"
+  exit 1
+fi
+
+echo "cluster setup: ${COUCHDB_HOST} ${COUCHDB_USER}:${COUCHDB_PASSWORD}"
+
+curl \
+  ${COUCHDB_HOST}/_cluster_setup \
+  --user ${COUCHDB_USER}:${COUCHDB_PASSWORD} \
+  -H 'Content-Type: application/json' \
+  --data-binary @- << EOF
+{
+  "action":"enable_single_node",
+  "singlenode":true,
+  "bind_address":"0.0.0.0",
+  "username":"${COUCHDB_USER}",
+  "password":"${COUCHDB_PASSWORD}"
+}
+EOF
+
+# Activate Per User Databases
+#curl -X PUT \
+#  ${COUCHDB_HOST}/_node/_local/_config/couch_peruser/enable -d '"true"' \
+#  --user ${COUCHDB_USER}:${COUCHDB_PASSWORD}
+
+# display cluster state i.e. {"state":"single_node_enabled"}
+curl \
+  ${COUCHDB_HOST}/_cluster_setup \
+  --user ${COUCHDB_USER}:${COUCHDB_PASSWORD}

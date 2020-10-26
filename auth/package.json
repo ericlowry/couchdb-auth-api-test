@@ -1,0 +1,24 @@
+{
+  "name": "auth",
+  "version": "1.0.0",
+  "description": "Authorization/Authentication Service",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Eric Lowry <eric@myrealms.org>",
+  "license": "MIT",
+  "dependencies": {
+    "assert": "^2.0.0",
+    "body-parser": "^1.19.0",
+    "cookie-parser": "^1.4.5",
+    "debug": "^4.2.0",
+    "express": "^4.17.1",
+    "http-status-codes": "^2.1.4",
+    "morgan": "^1.10.0",
+    "nano": "^8.2.2",
+    "redis": "^3.0.2",
+    "serve-favicon": "^2.5.0",
+    "short-uuid": "^4.1.0"
+  }
+}
