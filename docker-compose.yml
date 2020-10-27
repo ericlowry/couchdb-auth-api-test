@@ -33,13 +33,18 @@ services:
     command: 'redis-server /usr/local/etc/redis/redis.conf'
 
   auth:
-    build: ./auth
+    build: 
+      context: .
+      dockerfile: ./auth/Dockerfile
     depends_on:
       - db
       - cache
     ports:
       - 3001:3001
     volumes: 
+      - ./common/package.json:/opt/common/package.json
+      - ./common/package-lock.json:/opt/common/package-lock.json
+      - ./common/lib:/opt/common/lib
       - ./auth/package.json/:/opt/auth/package.json
       - ./auth/package-lock.json:/opt/auth/package-lock.json
       - ./auth/src:/opt/auth/src
@@ -53,19 +58,26 @@ services:
     command: nodemon --watch ./src src/auth-service.js
   
   api:
-    build: ./api
+    build: 
+      context: .
+      dockerfile: ./api/Dockerfile
     depends_on:
       - db
       - cache
     ports:
       - 3002:3002
     volumes: 
+      - ./common/package.json:/opt/common/package.json
+      - ./common/package-lock.json:/opt/common/package-lock.json
+      - ./common/lib:/opt/common/lib
       - ./api/package.json/:/opt/api/package.json
       - ./api/package-lock.json:/opt/api/package-lock.json
       - ./api/src:/opt/api/src
     environment: 
       - PORT=3002
+      - USERDB=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@db:5984/_users
+      - DATADB=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@db:5984/app-data
+      - TOKEN_CACHE
+      - DEBUG=api:*
     tty: true
-    command: nodemon --watch ./src src/api-service.js
-    
-  
+    command: sh -c "npm install --silent --no-fund ; nodemon --watch ./src --watch ../common/lib src/api-service.js"

@@ -5,6 +5,7 @@ const assert = require('assert');
 
 module.exports = (db, type, part = type) => {
   const _id = (id) => `${part}:${id}`;
+  const partitioned = type === part;
   return {
     create: (id, doc) => {
       assert(!doc._id, 'doc._id exists');
@@ -26,5 +27,22 @@ module.exports = (db, type, part = type) => {
     },
 
     delete: (id, rev) => db.destroy(_id(id), rev),
+
+    // no CRUD routines
+
+    exists: (id) => db.head(_id(id)).then(() => true),
+
+    retrieveAll: (opts = {}) => {
+      if (partitioned) {
+        return db
+          .partitionedList(part, { include_docs: true, ...opts })
+          .then((data) => data.rows.map((row) => row.doc));
+      } else {
+        return db
+          .list({ include_docs: true, ...opts })
+          .then((data) => data.rows.map((row) => row.doc))
+          .then((docs) => docs.filter((doc) => doc.type === type));
+      }
+    },
   };
 };

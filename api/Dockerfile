@@ -4,14 +4,27 @@ RUN npm install --global nodemon --silent --no-fund
 
 FROM node-15-with-nodemon
 
-WORKDIR /opt/api
+FROM node-15-with-nodemon as node-15-common
 
-COPY ./public ./public
+WORKDIR /opt/common
 
-COPY ./package.json .
-COPY ./package-lock.json .
-COPY ./src ./src
+COPY ./common/package.json .
+COPY ./common/package-lock.json .
+
+#COPY ./common/lib ./lib
 
 RUN npm install --silent --no-fund
 
-CMD ["node", "src/api-service.js"]
+FROM node-15-common
+
+WORKDIR /opt/api
+
+COPY ./api/public ./public
+
+COPY ./api/package.json .
+COPY ./api/package-lock.json .
+
+RUN npm install --silent --no-fund
+
+#COPY ./src ./src
+#CMD ["node", "src/api-service.js"]

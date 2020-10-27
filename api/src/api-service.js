@@ -7,7 +7,16 @@ const favIcon = require('serve-favicon');
 const logger = require('morgan');
 const pkg = require('../package.json');
 
-const { cex } = require('./lib');
+const cex = require('../../common/lib/cex');
+const globalErrorHandler = require('../../common/lib/global-error-handler');
+const httpError = require('../../common/lib/http-error');
+const notFoundHandler = require('../../common/lib/not-found-handler');
+
+const isAuth = require('./lib/is-auth');
+const hasRole = require('./lib/has-role');
+
+const userRoute = require('./routes/user-route');
+const widgetRoute = require('./routes/widget-route');
 
 const PORT = parseInt(process.env.PORT || 3000);
 
@@ -18,13 +27,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(favIcon(path.join(__dirname, '..', 'public', 'favicon.ico')));
 
 app.use(logger('dev'));
-
-const APIError = (status, message, reason = undefined) => {
-  const err = new Error(message);
-  err.status = status;
-  err.reason = reason;
-  return err;
-};
 
 app.get(
   '/',
@@ -37,7 +39,7 @@ app.get(
 );
 
 app.get(
-  '/version',
+  '/api/version',
   cex(async (req, res) => {
     return res.send({
       ok: true,
@@ -47,29 +49,22 @@ app.get(
   })
 );
 
-// 404 handler
-app.use(
-  cex((req) => {
-    throw APIError(403, 'Not Found', `no route to (${req.method}) ${req.path}`);
+app.get(
+  '/api/test',
+  cex(hasRole('ADMIN')),
+  cex(async (req, res) => {
+    res.send({ ok: true, msg: 'made it!' });
   })
 );
 
-// global error handler
-app.use((err, req, res, next) => {
-  const status = err.status || err.statusCode || 500;
-  const className = err.constructor.name;
-  if (status === 500) {
-    console.error(err);
-  }
+app.use('/api/user', userRoute);
+app.use('/api/widget', widgetRoute);
 
-  res.status(status).send({
-    ok: false,
-    status,
-    error: err.message || err.toString(),
-    reason: err.reason || err.code,
-    class: className,
-  });
-});
+// 404 handler
+app.use(cex(notFoundHandler));
+
+// global error handler must be last...
+app.use(globalErrorHandler);
 
 app.listen(PORT, () => {
   console.log(`listening on http://0.0.0.0:${PORT}`);

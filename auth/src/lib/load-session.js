@@ -5,7 +5,7 @@ const debug = require('debug')('auth:load-session');
 const { UNAUTHORIZED } = require('http-status-codes');
 const refreshCookie = require('./refresh-cookie');
 const sessionCache = require('./session-cache');
-const httpError = require('./http-error');
+const httpError = require('../../../common/lib/http-error');
 
 const loadSession = async (req, res, next) => {
   // get the refreshToken from the cookie... (if any)
@@ -17,11 +17,9 @@ const loadSession = async (req, res, next) => {
     throw httpError(UNAUTHORIZED, undefined, 'No Session');
   }
 
-  debug(`refreshToken: ${req.refreshToken}`);
   try {
     req.session = await sessionCache.retrieve(req.refreshToken);
-    debug(req.session);
-    await sessionCache.setTTL(req.refreshToken);
+    debug(`session: (${req.session.id}) ${req.refreshToken}`);
     next();
   } catch (err) {
     throw httpError(UNAUTHORIZED, undefined, 'Session Has Expired');

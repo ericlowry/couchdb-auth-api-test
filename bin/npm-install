@@ -9,15 +9,21 @@ fi
 PACKAGE=$1
 SERVICE=$2
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+#DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-docker-compose stop $SERVICE
+#docker-compose stop $SERVICE
 
-pushd $DIR/../$SERVICE
+if [ ! -f "./$SERVICE/package.json" ]
+then
+  echo "ERROR: no ./$SERVICE/package.json"
+  exit 1
+fi
 
+cd ./$SERVICE
 npm install --save $PACKAGE
+cd ..
 
-popd
+sleep 1
 
-docker-compose build $SERVICE
-docker-compose start $SERVICE
+echo "Restarting Service $SERVICE"
+docker-compose restart $SERVICE

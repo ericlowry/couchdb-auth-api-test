@@ -6,18 +6,21 @@ const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const favIcon = require('serve-favicon');
 const logger = require('morgan');
-const { getStatusText } = require('http-status-codes');
 
 const pkg = require('../package.json');
 
-const cex = require('./lib/cex');
-const httpError = require('./lib/http-error');
+const cex = require('../../common/lib/cex');
+const globalErrorHandler = require('../../common/lib/global-error-handler');
+const httpError = require('../../common/lib/http-error');
+const notFoundHandler = require('../../common/lib/not-found-handler');
+const uuid = require('../../common/lib/uuid');
+
 const users = require('./lib/users');
-const uuid = require('./lib/uuid');
 const sessionCache = require('./lib/session-cache');
 const tokenCache = require('./lib/token-cache');
 const refreshCookie = require('./lib/refresh-cookie');
 const loadSession = require('./lib/load-session');
+const loadUser = require('./lib/load-user');
 
 const PORT = parseInt(process.env.PORT || 3000);
 
@@ -29,6 +32,11 @@ app.use(favIcon(path.join(__dirname, '..', 'public', 'favicon.ico')));
 
 app.use(logger('dev'));
 
+//
+// GET / 
+//
+// Service info
+//
 app.get(
   '/',
   cex(async (req, res) => {
@@ -39,8 +47,13 @@ app.get(
   })
 );
 
+//
+// GET /auth/version
+//
+// Service version info
+//
 app.get(
-  '/version',
+  '/auth/version',
   cex(async (req, res) => {
     return res.send({
       ok: true,
@@ -50,6 +63,9 @@ app.get(
   })
 );
 
+//
+// profile(user) : sanitize a user record for use by the client
+//
 const profile = ({ name, label, roles, email }) => ({
   name,
   label,
@@ -57,6 +73,11 @@ const profile = ({ name, label, roles, email }) => ({
   email,
 });
 
+//
+// POST {name,password,data} > /auth/local/login
+//
+// Authenticate a user and build a session
+//
 app.post(
   '/auth/local/login',
   cex(async (req, res) => {
@@ -82,6 +103,12 @@ app.post(
   })
 );
 
+//
+// POST /auth/logout 
+// POST {deep: true} > /auth/logout
+// 
+// Remove a user's session or all of user's sessions (deep)
+//
 app.post(
   '/auth/logout',
   cex(async (req, res) => {
@@ -95,7 +122,7 @@ app.post(
         try {
           const session = await sessionCache.retrieve(refreshToken);
           const user = await users.retrieve(session.id);
-          if ( user.version === session.version ) {
+          if (user.version === session.version) {
             user.version = await uuid();
             await users.update(user);
           }
@@ -111,31 +138,95 @@ app.post(
   })
 );
 
-// 404 handler
-app.use(
-  cex((req) => {
-    throw httpError(
-      403,
-      'Not Found',
-      `no route to (${req.method}) ${req.path}`
-    );
+//
+// touchSession() Middleware to reset a session's TTL
+//
+const touchSession = async (req, res, next) => {
+  await sessionCache.setTTL(req.refreshToken);
+  next();
+};
+
+//
+// GET /auth/profile
+//
+// Return a session's user profile, data and a fresh token
+//
+app.get(
+  '/auth/profile',
+  cex(loadSession),
+  cex(loadUser),
+  cex(touchSession),
+  cex(async (req, res) => {
+    const accessToken = await uuid();
+    await tokenCache.create(accessToken, req.user);
+    res.send({
+      ok: true,
+      token: accessToken,
+      profile: profile(req.user),
+      data: req.session.data,
+    });
   })
 );
 
-// global error handler
-app.use((err, req, res, next) => {
-  const status = err.status || err.statusCode || 500;
-  if (status === 500) {
-    console.error(err);
-  }
+//
+// GET /auth/token
+//
+// Generate a fresh access token
+//
+app.get(
+  '/auth/token',
+  cex(loadSession),
+  cex(loadUser),
+  cex(touchSession),
+  cex(async (req, res) => {
+    const accessToken = await uuid();
+    await tokenCache.create(accessToken, req.user);
+    res.send({
+      ok: true,
+      token: accessToken,
+    });
+  })
+);
 
-  res.status(status).send({
-    ok: false,
-    status,
-    error: err.error || err.message || getStatusText(status),
-    reason: err.reason || err.code,
-  });
-});
+//
+// GET /auth/session
+//
+// Get the current session's data
+//
+app.get(
+  '/auth/session',
+  cex(loadSession),
+  cex(async (req, res) => {
+    res.send({
+      ok: true,
+      data: req.session.data,
+    });
+  })
+);
+
+//
+// POST {data:{...}} > /auth/session 
+//
+// Update the current sessions data
+//
+app.post(
+  '/auth/session',
+  cex(loadSession),
+  cex(touchSession),
+  cex(async (req, res) => {
+    req.session.data = req.body.data || {};
+    sessionCache.update(req.refreshToken, req.session);
+    res.send({
+      ok: true,
+    });
+  })
+);
+
+// 404 handler
+app.use(cex(notFoundHandler));
+
+// global error handler
+app.use(globalErrorHandler);
 
 app.listen(PORT, () => {
   console.log(`listening on http://0.0.0.0:${PORT}`);
