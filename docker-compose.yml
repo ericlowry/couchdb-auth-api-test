@@ -81,3 +81,24 @@ services:
       - DEBUG=api:*
     tty: true
     command: sh -c "npm install --silent --no-fund ; nodemon --watch ./src --watch ../common/lib src/api-service.js"
+
+  client:
+    build: ./client
+    depends_on: 
+      - auth
+      - api
+    ports:
+      - 3000:3000
+      - 35729:35729
+    volumes: 
+      - ./client/package.json:/opt/client/package.json
+      - ./client/yarn.lock:/opt/client/yarn.locK
+      - ./client/src:/opt/client/src
+    environment:
+      - BROWSER=none
+      - AUTH_PROXY=http://auth:3001
+      - API_PROXY=http://api:3002
+    tty: true
+    command: sh -c "yarn ; yarn start | cat"
+      
+  

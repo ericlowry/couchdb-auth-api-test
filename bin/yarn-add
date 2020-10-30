@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+if [ $# -le 1 ]
+then
+  echo "usage: yarn-add package service"
+  exit 1
+fi
+
+PACKAGE=$1
+SERVICE=$2
+
+if [ ! -f "./$SERVICE/package.json" ]
+then
+  echo "ERROR: no ./$SERVICE/package.json"
+  exit 1
+fi
+
+cd ./$SERVICE
+yarn add $PACKAGE
+cd ..
+
+sleep 1
+
+echo "Restarting Service $SERVICE"
+docker-compose restart $SERVICE
